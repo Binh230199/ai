@@ -1,0 +1,49 @@
+name: auto-push-commit
+description: Full pre-push pipeline — review staged diff, generate commit message, commit and push to Gerrit.
+
+steps:
+  # ── Step 1: Review coding style + feature correctness ─────────────────────
+  - id: review-feature
+    type: agent
+    agent: reviewer-feature
+    description: Review coding style and logic correctness
+    input: git_diff_staged
+    expect: "[PASS]"
+    on_fail: abort
+
+  # ── Step 2: Review static analysis violations ──────────────────────────────
+  - id: review-static
+    type: agent
+    agent: reviewer-static
+    description: Check for static analysis violations (MISRA / AUTOSAR)
+    input: git_diff_staged
+    expect: "[PASS]"
+    on_fail: abort
+
+  # ── Step 3: Generate conventional commit message ──────────────────────────
+  # Runs only if both reviews passed (enforced by on_fail: abort above,
+  # but condition added explicitly for clarity)
+  - id: create-commit-msg
+    type: prompt
+    description: Generate conventional commit message from staged diff
+    prompt: .github/prompts/create-commit-message.prompt.md
+    input: git_diff_staged
+    output: commit_message
+    condition: "steps.review-feature.passed && steps.review-static.passed"
+    on_fail: abort
+
+  # ── Step 4: Git commit with generated message ─────────────────────────────
+  - id: git-commit
+    type: shell
+    description: Stage all and commit
+    command: "git commit -am \"{{commit_message}}\""
+    condition: "steps.create-commit-msg.passed"
+    on_fail: abort
+
+  # ── Step 5: Push to Gerrit for review ────────────────────────────────────
+  - id: git-push
+    type: shell
+    description: Push to Gerrit refs/for/main
+    command: "git push origin HEAD:refs/for/main"
+    condition: "steps.git-commit.passed"
+    on_fail: abort

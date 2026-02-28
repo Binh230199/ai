@@ -1,0 +1,38 @@
+name: bugfix-push-commit
+description: Bug fix pipeline — validates fix against Jira ticket, generates commit message with ticket ref, commits and pushes.
+
+steps:
+  # ── Step 1: Validate fix against Jira root cause ──────────────────────────
+  - id: review-bugfix
+    type: agent
+    agent: reviewer-bugfix
+    description: Validate fix addresses root cause in Jira ticket
+    input: git_diff_staged
+    expect: "[PASS]"
+    on_fail: abort
+
+  # ── Step 2: Generate commit message (fix type, with ticket ref) ───────────
+  - id: create-commit-msg
+    type: prompt
+    description: Generate conventional commit message (fix type)
+    prompt: .github/prompts/create-commit-message.prompt.md
+    input: git_diff_staged
+    output: commit_message
+    condition: "steps.review-bugfix.passed"
+    on_fail: abort
+
+  # ── Step 3: Git commit ────────────────────────────────────────────────────
+  - id: git-commit
+    type: shell
+    description: Stage all and commit
+    command: "git commit -am \"{{commit_message}}\""
+    condition: "steps.create-commit-msg.passed"
+    on_fail: abort
+
+  # ── Step 4: Push to Gerrit ────────────────────────────────────────────────
+  - id: git-push
+    type: shell
+    description: Push to Gerrit refs/for/main
+    command: "git push origin HEAD:refs/for/main"
+    condition: "steps.git-commit.passed"
+    on_fail: abort
