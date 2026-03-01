@@ -1,0 +1,41 @@
+name: push-code-change
+description: Generate a commit message from staged changes and push to the detected Git platform.
+
+steps:
+  # ── Step 1: Ask for JIRA ticket if this repo uses JIRA-style commits ──────
+  # {{git_jira_ticket}} is auto-detected from recent commits at workflow start.
+  # If it's non-empty (e.g. 'PROJ'), the input box appears; otherwise skipped.
+  - id: ask-jira-ticket
+    type: input
+    description: "Enter JIRA ticket ID (detected prefix: {{git_jira_ticket}})"
+    question: "This repo uses JIRA tickets (detected: {{git_jira_ticket}}-XXXX). Enter the ticket ID for this commit, or leave empty to skip."
+    placeholder: "{{git_jira_ticket}}-"
+    output: jira_ticket
+    optional: true
+    condition: "vars.git_jira_ticket"
+    on_fail: continue
+
+  # ── Step 2: Generate commit message (format inferred from recent commits) ──
+  - id: create-commit-msg
+    type: prompt
+    description: Generate commit message matching this repo's format
+    prompt: .github/prompts/create-commit-message.prompt.md
+    input: git_diff_staged
+    output: commit_message
+    on_fail: abort
+
+  # ── Step 3: Commit ─────────────────────────────────────────────────────────
+  - id: git-commit
+    type: shell
+    description: Stage all and commit
+    command: "git commit -am \"{{commit_message}}\""
+    condition: "steps.create-commit-msg.passed"
+    on_fail: abort
+
+  # ── Step 4: Push (platform auto-detected: Gerrit/GitHub/GitLab/Bitbucket) ──
+  - id: git-push
+    type: shell
+    description: "Push to remote (auto-detected: {{git_platform}})"
+    command: "{{git_push_cmd}}"
+    condition: "steps.git-commit.passed"
+    on_fail: abort

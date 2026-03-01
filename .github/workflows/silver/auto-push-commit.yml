@@ -1,38 +1,52 @@
-name: auto-push-commit
-description: Full pre-push pipeline — review staged diff, generate commit message, commit and push (platform auto-detected).
+﻿name: auto-push-commit
+description: Full pre-push pipeline — auto-select reviewer, review staged diff, generate commit message, commit and push (platform auto-detected).
 
 steps:
-  # ── Step 1: Review coding style + feature correctness ─────────────────────
-  - id: review-feature
-    type: agent
-    agent: reviewer-feature
-    description: Review coding style and logic correctness
+  # ── Phase 1: Review (same as review-code-change) ──────────────────────────
+
+  # Step 1: Triage — detect change type and select reviewer agent
+  - id: triage
+    type: prompt
+    description: Auto-detect change type and select reviewer
+    prompt: .github/prompts/triage-change-type.prompt.md
     input: git_diff_staged
-    expect: "[PASS]"
+    output: selected_agent
     on_fail: abort
 
-  # ── Step 2: Review static analysis violations ──────────────────────────────
-  - id: review-static
+  # Step 2: Run the selected reviewer (dynamic agent resolution)
+  - id: review
     type: agent
-    agent: reviewer-static
-    description: Check for static analysis violations (MISRA / AUTOSAR)
+    description: "Run {{selected_agent}}"
+    agent: "{{selected_agent}}"
     input: git_diff_staged
     expect: "[PASS]"
+    condition: "steps.triage.passed"
     on_fail: abort
 
-  # ── Step 3: Generate conventional commit message ──────────────────────────
-  # Runs only if both reviews passed (enforced by on_fail: abort above,
-  # but condition added explicitly for clarity)
+  # ── Phase 2: Push (same as push-code-change) ──────────────────────────────
+
+  # Step 3: Ask for JIRA ticket if this repo uses JIRA-style commits
+  - id: ask-jira-ticket
+    type: input
+    description: "Enter JIRA ticket ID (detected prefix: {{git_jira_ticket}})"
+    question: "This repo uses JIRA tickets (detected: {{git_jira_ticket}}-XXXX). Enter the ticket ID for this commit, or leave empty to skip."
+    placeholder: "{{git_jira_ticket}}-"
+    output: jira_ticket
+    optional: true
+    condition: "steps.review.passed && vars.git_jira_ticket"
+    on_fail: continue
+
+  # Step 4: Generate commit message (format inferred from recent commits)
   - id: create-commit-msg
     type: prompt
-    description: Generate conventional commit message from staged diff
+    description: Generate commit message matching this repo's format
     prompt: .github/prompts/create-commit-message.prompt.md
     input: git_diff_staged
     output: commit_message
-    condition: "steps.review-feature.passed && steps.review-static.passed"
+    condition: "steps.review.passed"
     on_fail: abort
 
-  # ── Step 4: Git commit with generated message ─────────────────────────────
+  # Step 5: Commit
   - id: git-commit
     type: shell
     description: Stage all and commit
@@ -40,7 +54,7 @@ steps:
     condition: "steps.create-commit-msg.passed"
     on_fail: abort
 
-  # ── Step 5: Push (platform-aware: Gerrit → refs/for/<branch>, GitHub/GitLab → HEAD:<branch>)
+  # Step 6: Push (platform auto-detected: Gerrit/GitHub/GitLab/Bitbucket)
   - id: git-push
     type: shell
     description: "Push to remote (auto-detected: {{git_platform}})"

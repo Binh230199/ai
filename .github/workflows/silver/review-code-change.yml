@@ -1,0 +1,25 @@
+name: review-code-change
+description: Analyze the staged diff, auto-select the right reviewer agent (feature/bugfix/static/unittest), and run the review.
+
+steps:
+  # ── Step 1: Triage — detect change type and select reviewer agent ──────────
+  # Reads the diff and outputs one of:
+  #   reviewer-feature | reviewer-bugfix | reviewer-static | reviewer-unittest
+  - id: triage
+    type: prompt
+    description: Auto-detect change type and select reviewer
+    prompt: .github/prompts/triage-change-type.prompt.md
+    input: git_diff_staged
+    output: selected_agent
+    on_fail: abort
+
+  # ── Step 2: Run the selected reviewer ────────────────────────────────────
+  # agent: "{{selected_agent}}" resolves dynamically from the triage output.
+  - id: review
+    type: agent
+    description: "Run {{selected_agent}}"
+    agent: "{{selected_agent}}"
+    input: git_diff_staged
+    expect: "[PASS]"
+    condition: "steps.triage.passed"
+    on_fail: abort
