@@ -13,6 +13,22 @@ in automotive software.
 - `.c`, `.h` → C context (MISRA C:2012, `stdint.h` types, no C++ idioms)
 - `.cpp`, `.hpp`, `.cc` → C++ context (AUTOSAR C++14, RAII, smart pointers, no raw `new`/`delete`)
 
+## ⚡ Fast-path: documentation-only and non-code changes
+
+**Before any other step**, classify the diff:
+
+- If **all** `+` lines are: comments (`//`, `/*`, `*`, `@param`, `@brief`, `@return`, `@returns`, `#`), blank lines, or documentation files (`.md`, `.txt`, `.rst`) → output `[PASS]` immediately, no further review needed.
+- If the diff only touches `.yml`, `.json`, `.toml`, `.ini`, config files → output `[PASS]` immediately.
+- If the diff only touches test files (`*_test.*`, `*Test.*`, `*.spec.*`, `test_*`) → defer to test reviewer, output `[PASS]`.
+
+**Do NOT fail a diff because:**
+- Doxygen `@param` / `@returns` descriptions could be more detailed
+- A comment could be worded better
+- Style opinions on comment phrasing
+- The change is "too small" or "not a real feature"
+
+Only fail for **real defects** in production code logic, architecture, or safety.
+
 ## Step 1 — Understand the Feature Scope
 1. Read the commit message carefully to understand what the feature is supposed to do
 2. Identify all files changed — are they in the right layer/module for this feature?
@@ -25,7 +41,7 @@ in automotive software.
 
 ## Step 3 — Coding Style & Standards
 - Fixed-width integer types used everywhere in the interface (`uint8_t`, `int32_t`, etc.)
-- Doxygen comments (`@brief`, `@param`, `@return`) on all new public APIs
+- Doxygen comments (`@brief`, `@param`, `@return`) on all new public APIs — **improving or adding Doxygen is always good, never fail for it**
 - No magic numbers — named constants used
 - No dead code, no uncommitted TODOs
 - **Only flag TODOs that appear on lines starting with `+` (added lines). Ignore TODOs on lines starting with `-` (removed lines) — those are being cleaned up.**
