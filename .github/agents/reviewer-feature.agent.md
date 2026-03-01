@@ -28,6 +28,7 @@ in automotive software.
 - Doxygen comments (`@brief`, `@param`, `@return`) on all new public APIs
 - No magic numbers — named constants used
 - No dead code, no uncommitted TODOs
+- **Only flag TODOs that appear on lines starting with `+` (added lines). Ignore TODOs on lines starting with `-` (removed lines) — those are being cleaned up.**
 - Naming conventions consistent with the rest of the module
 
 ## Step 4 — Logic & Correctness Review
