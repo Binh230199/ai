@@ -1,5 +1,5 @@
 name: auto-push-commit
-description: Full pre-push pipeline — review staged diff, generate commit message, commit and push to Gerrit.
+description: Full pre-push pipeline — review staged diff, generate commit message, commit and push (platform auto-detected).
 
 steps:
   # ── Step 1: Review coding style + feature correctness ─────────────────────
@@ -40,10 +40,10 @@ steps:
     condition: "steps.create-commit-msg.passed"
     on_fail: abort
 
-  # ── Step 5: Push to Gerrit for review ────────────────────────────────────
+  # ── Step 5: Push (platform-aware: Gerrit → refs/for/<branch>, GitHub/GitLab → HEAD:<branch>)
   - id: git-push
     type: shell
-    description: Push to Gerrit refs/for/main
-    command: "git push origin HEAD:refs/for/main"
+    description: "Push to remote (auto-detected: {{git_platform}})"
+    command: "{{git_push_cmd}}"
     condition: "steps.git-commit.passed"
     on_fail: abort

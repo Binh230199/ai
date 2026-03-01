@@ -29,10 +29,10 @@ steps:
     condition: "steps.create-commit-msg.passed"
     on_fail: abort
 
-  # ── Step 4: Push to Gerrit ────────────────────────────────────────────────
+  # ── Step 4: Push (platform-aware) ───────────────────────────────────────
   - id: git-push
     type: shell
-    description: Push to Gerrit refs/for/main
-    command: "git push origin HEAD:refs/for/main"
+    description: "Push to remote (auto-detected: {{git_platform}})"
+    command: "{{git_push_cmd}}"
     condition: "steps.git-commit.passed"
     on_fail: abort
