@@ -1,7 +1,7 @@
 ---
 description: Reviews new or updated unit tests — coverage completeness, test design quality, assertion correctness, and isolation.
 tools: ["codebase", "search", "changes", "usages", "problems"]
-model: claude-sonnet-4-5
+model: Raptor mini (Preview) (copilot)
 ---
 
 # Reviewer — Unit Tests
