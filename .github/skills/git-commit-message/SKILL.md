@@ -24,7 +24,13 @@ project's existing convention without requiring the author to remember format ru
 
 ---
 
-## Step 1: Collect the Diff
+## Step-by-Step Workflows
+
+The commit message generation workflow is defined in the numbered Step sections below
+(Step 1 – Step 6). Follow them in order: read diff → infer type/scope → check for Jira
+ticket → compose subject → write body → output the final message.
+
+### Step 1: Collect the Diff
 
 Determine the state of changes and collect the diff content:
 
@@ -40,16 +46,16 @@ to commit, or check `git status` output first.
 
 ---
 
-## Step 2: Determine the Commit Convention
+### Step 2: Determine the Commit Convention
 
-### 2A — Check for template file
+#### 2A — Check for template file
 
 Look for `templates/commit-template.md` inside this skill folder
 (`d:\AI\.github\skills\git-commit-message\templates\commit-template.md`).
 
 If the file exists, load it and use its format exactly.
 
-### 2B — Derive from recent history (fallback)
+#### 2B — Derive from recent history (fallback)
 
 If no template file exists, run:
 
@@ -69,7 +75,7 @@ variation.
 
 ---
 
-## Step 3: Analyze the Diff
+### Step 3: Analyze the Diff
 
 Read the diff and extract:
 
@@ -108,11 +114,11 @@ Flag it: _"This diff touches X and Y — recommend two commits."_
 
 ---
 
-## Step 4: Compose the Commit Message
+### Step 4: Compose the Commit Message
 
 Apply the format from Step 2 with the content from Step 3.
 
-### Standard output (Conventional Commits + body)
+#### Standard output (Conventional Commits + body)
 
 ```
 <type>(<scope>): <short imperative description>
@@ -140,7 +146,7 @@ Apply the format from Step 2 with the content from Step 3.
 
 ---
 
-## Step 5: Output
+### Step 5: Output
 
 Present the commit message in a code block ready to copy:
 
@@ -160,7 +166,7 @@ Then offer:
 
 ---
 
-## Step 6: Apply (optional)
+### Step 6: Apply (optional)
 
 If the user confirms the message, run:
 
@@ -181,14 +187,6 @@ git commit -F /tmp/commit_msg.txt
 - `git` installed and a repository initialized.
 - Project following a commit convention (e.g. Conventional Commits).
 - Staged or unstaged changes ready to commit (`git diff --cached` or `git diff`).
-
-
-## Step-by-Step Workflows
-
-The commit message generation workflow is defined in the numbered Step sections below
-(Step 1 – Step 6). Follow them in order: read diff → infer type/scope → check for Jira
-ticket → compose subject → write body → output the final message.
-
 
 ## Troubleshooting
 
