@@ -15,8 +15,8 @@ steps:
   # ── Step 2: Commit ─────────────────────────────────────────────────────────
   - id: git-commit
     type: shell
-    description: Stage all and commit
-    command: "git commit -am \"{{commit_message}}\""
+    description: Commit staged changes only
+    command: "git commit -m \"{{commit_message}}\""
     condition: "steps.create-commit-msg.passed"
     on_fail: abort
 
