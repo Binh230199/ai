@@ -6,7 +6,8 @@ Provides tools for reading PDF, Word (.docx), and Excel (.xlsx/.csv) files
 so that GitHub Copilot can process document content via MCP.
 
 Supported tools:
-  - read_pdf       : Extract text from a PDF file
+  - read_pdf       : Extract text from a PDF file (with optional page_range)
+  - search_pdf     : Search for a keyword/phrase in a PDF and return matching snippets
   - read_word      : Extract text from a Word .docx file
   - read_excel     : Extract data from Excel / CSV as Markdown tables
   - get_file_info  : Get metadata about a supported document file
@@ -55,8 +56,25 @@ def _validate_path(file_path: str) -> Path:
 # PDF reader
 # ---------------------------------------------------------------------------
 
-def _read_pdf(path: Path) -> str:
-    """Extract text from a PDF using PyMuPDF (fitz)."""
+def _parse_page_range(page_range: str, total_pages: int) -> tuple[int, int]:
+    """Parse '200-220' or '5' into (start_idx, end_idx), 0-based inclusive."""
+    pr = page_range.strip()
+    if "-" in pr:
+        parts = pr.split("-", 1)
+        start = max(1, int(parts[0].strip()))
+        end = min(total_pages, int(parts[1].strip()))
+    else:
+        start = end = max(1, min(total_pages, int(pr)))
+    return start - 1, end - 1  # convert to 0-based
+
+
+def _read_pdf(path: Path, page_range: Optional[str] = None) -> str:
+    """Extract text from a PDF using PyMuPDF (fitz).
+
+    Args:
+        path: Path to the PDF file.
+        page_range: Optional page range string, e.g. '5' or '200-220' (1-based).
+    """
     try:
         import fitz  # pymupdf
     except ImportError:
@@ -66,19 +84,107 @@ def _read_pdf(path: Path) -> str:
         )
 
     doc = fitz.open(str(path))
+    total = doc.page_count
+
+    if page_range:
+        start_idx, end_idx = _parse_page_range(page_range, total)
+        page_indices = range(start_idx, end_idx + 1)
+        range_label = f" (pages {start_idx + 1}–{end_idx + 1} of {total})"
+    else:
+        page_indices = range(total)
+        range_label = f" ({total} pages)"
+
     pages: list[str] = []
-    for i, page in enumerate(doc, start=1):
-        text = page.get_text().strip()
+    for i in page_indices:
+        text = doc[i].get_text().strip()
         if text:
-            pages.append(f"--- Page {i} ---\n{text}")
+            pages.append(f"--- Page {i + 1} ---\n{text}")
     doc.close()
 
     if not pages:
         return (
-            "(No extractable text found. The PDF may contain only scanned images.\n"
+            f"(No extractable text found{range_label}. "
+            "The PDF may contain only scanned images. "
             "Consider using an OCR tool to convert it first.)"
         )
-    return "\n\n".join(pages)
+    return f"[Extracted{range_label}]\n\n" + "\n\n".join(pages)
+
+
+def _search_pdf(
+    path: Path,
+    query: str,
+    max_results: int = 10,
+    context_chars: int = 400,
+) -> str:
+    """Search for text in a PDF and return matching passages with page context.
+
+    Uses PyMuPDF's built-in page.search_for() for fast per-page lookup,
+    then extracts a context window from the raw page text around each hit.
+    Never reads the full document into memory at once.
+    """
+    try:
+        import fitz  # pymupdf
+    except ImportError:
+        raise ImportError(
+            "pymupdf is required to search PDF files.\n"
+            "Install it with: pip install pymupdf"
+        )
+
+    doc = fitz.open(str(path))
+    results: list[str] = []
+    total_hits = 0
+
+    for page_idx in range(doc.page_count):
+        if total_hits >= max_results:
+            break
+
+        page = doc[page_idx]
+        # Fast built-in search — returns list of matching Rect objects
+        hit_rects = page.search_for(query)
+        if not hit_rects:
+            continue
+
+        page_num = page_idx + 1  # 1-based for display
+        page_text = page.get_text()
+        lower_text = page_text.lower()
+        lower_query = query.lower()
+
+        pos = 0
+        page_snippets: list[str] = []
+        while total_hits < max_results:
+            idx = lower_text.find(lower_query, pos)
+            if idx == -1:
+                break
+
+            half = context_chars // 2
+            start = max(0, idx - half)
+            end = min(len(page_text), idx + len(query) + half)
+            snippet = page_text[start:end].strip()
+            if start > 0:
+                snippet = "..." + snippet
+            if end < len(page_text):
+                snippet = snippet + "..."
+
+            page_snippets.append(snippet)
+            total_hits += 1
+            pos = idx + len(query)
+
+        if page_snippets:
+            results.append(
+                f"### Page {page_num}\n\n"
+                + "\n\n---\n\n".join(page_snippets)
+            )
+
+    doc.close()
+
+    if not results:
+        return f'No matches found for: `{query}`'
+
+    header = (
+        f'Found **{total_hits}** match(es) for `{query}` '
+        f'(showing up to {max_results} — use max_results to increase):'
+    )
+    return header + "\n\n" + "\n\n---\n\n".join(results)
 
 
 # ---------------------------------------------------------------------------
@@ -234,9 +340,10 @@ async def list_tools() -> list[types.Tool]:
         types.Tool(
             name="read_pdf",
             description=(
-                "Read and extract the full text content of a PDF file. "
-                "Returns text organized by page. Works best with text-based PDFs; "
-                "scanned/image-only PDFs will return a notice to use OCR."
+                "Read and extract text content from a PDF file, organized by page. "
+                "Use 'page_range' to read only a subset of pages (e.g. '5' or '200-220') "
+                "instead of the full document — much faster for large PDFs. "
+                "For keyword search use 'search_pdf' instead."
             ),
             inputSchema={
                 "type": "object",
@@ -244,9 +351,48 @@ async def list_tools() -> list[types.Tool]:
                     "file_path": {
                         "type": "string",
                         "description": "Absolute path to the PDF file (e.g. C:/Documents/report.pdf)",
-                    }
+                    },
+                    "page_range": {
+                        "type": "string",
+                        "description": (
+                            "Optional: pages to read (1-based). "
+                            "Single page: '5'. Range: '200-220'. "
+                            "If omitted, the entire document is returned."
+                        ),
+                    },
                 },
                 "required": ["file_path"],
+            },
+        ),
+        types.Tool(
+            name="search_pdf",
+            description=(
+                "Search for a keyword or phrase inside a PDF file and return "
+                "matching text passages with surrounding context and page numbers. "
+                "MUCH faster than reading the whole PDF — use this first when you "
+                "need to locate a specific rule, section, or term in a large document."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Absolute path to the PDF file",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Text to search for (case-insensitive)",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of matching snippets to return (default: 10)",
+                    },
+                    "context_chars": {
+                        "type": "integer",
+                        "description": "Characters of context to show around each match (default: 400)",
+                    },
+                },
+                "required": ["file_path", "query"],
             },
         ),
         types.Tool(
@@ -323,7 +469,20 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
             path = _validate_path(arguments["file_path"])
             if path.suffix.lower() != ".pdf":
                 raise ValueError(f"Expected a .pdf file, got '{path.suffix}'")
-            content = _read_pdf(path)
+            page_range: Optional[str] = arguments.get("page_range")
+            content = _read_pdf(path, page_range)
+            return [types.TextContent(type="text", text=f"**File:** `{path.name}`\n\n{content}")]
+
+        elif name == "search_pdf":
+            path = _validate_path(arguments["file_path"])
+            if path.suffix.lower() != ".pdf":
+                raise ValueError(f"Expected a .pdf file, got '{path.suffix}'")
+            query = arguments["query"]
+            if not query.strip():
+                raise ValueError("query must not be empty")
+            max_results: int = int(arguments.get("max_results", 10))
+            context_chars: int = int(arguments.get("context_chars", 400))
+            content = _search_pdf(path, query, max_results, context_chars)
             return [types.TextContent(type="text", text=f"**File:** `{path.name}`\n\n{content}")]
 
         elif name == "read_word":
