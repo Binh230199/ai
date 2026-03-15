@@ -1,0 +1,14 @@
+# MCP File Reader — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# MCP SDK (Model Context Protocol — required for GitHub Copilot integration)
+mcp>=1.0.0
+
+# PDF reading
+pymupdf>=1.24.0          # import as 'fitz' — fast, reliable PDF text extraction
+
+# Word (.docx) reading
+python-docx>=1.1.0       # reads paragraphs, tables, headings, metadata
+
+# Excel (.xlsx) reading
+openpyxl>=3.1.0          # reads .xlsx workbooks; also handles .csv via stdlib csv module
