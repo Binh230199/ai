@@ -1,0 +1,61 @@
+name: design-agent-system
+description: >
+  Full AI pipeline to design and scaffold a complete agent system from a role
+  description. Given any role (e.g. "planner", "security reviewer"), produces:
+    - one .agent.md (the agent persona + workflow)
+    - one or more SKILL.md files (domain knowledge packages)
+    - one or more .instructions.md files (coding/output conventions)
+    - one or more .prompt.md files (user-facing slash commands)
+  All files are wired together and production-ready — no placeholders.
+
+steps:
+
+  # ── Step 1: Triage — decompose the role into a structured resource plan ────
+  # The triage prompt analyzes the user's role description and outputs a
+  # structured JSON resource plan: agent name, skills to create, instructions,
+  # and prompts. This plan drives all subsequent creation steps.
+  # Output schema:
+  #   {
+  #     "agent":        { name, description, tools[], model, domain },
+  #     "skills":       [ { name, purpose, create: bool } … ],
+  #     "instructions": [ { name, applyTo, purpose } … ],
+  #     "prompts":      [ { name, description, task } … ]
+  #   }
+  - id: triage-resources
+    type: prompt
+    description: Analyze the role and produce a structured JSON resource plan
+    prompt: .github/prompts/agent-system-triage.prompt.md
+    input: user_input                # plain-text role description from the user
+    output: resource_plan            # structured JSON consumed by next step
+    on_fail: abort
+
+  # ── Step 2: Scaffold — create all agent system files ──────────────────────
+  # The Agent System Architect reads the resource plan from Step 1 and creates
+  # every file: .agent.md, SKILL.md(s), .instructions.md(s), .prompt.md(s).
+  # It loads the four creation skills automatically:
+  #   create-custom-agent, create-custom-skill,
+  #   create-custom-instruction, create-custom-prompt
+  - id: scaffold-agent-system
+    type: agent
+    agent: Agent System Architect
+    description: Create all agent system files from the resource plan
+    input: resource_plan
+    expect: "[SCAFFOLD_COMPLETE]"
+    condition: "steps.triage-resources.passed"
+    on_fail: abort
+
+  # ── Step 3: Self-review — verify consistency and completeness ─────────────
+  # The Code Reviewer inspects every generated file and confirms:
+  #   - Frontmatter is valid (required fields present, name matches directory)
+  #   - Agent references its skills and instructions by name in the body
+  #   - Every prompt sets agent: <agent-name> in frontmatter
+  #   - No orphaned files (every created file is referenced from the agent)
+  #   - No <placeholder> or TODO remains in any file
+  - id: review-generated-files
+    type: agent
+    agent: Code Reviewer
+    description: Verify generated agent system files for consistency
+    input: scaffold-agent-system.created_files
+    expect: "[PASS]"
+    condition: "steps.scaffold-agent-system.passed"
+    on_fail: warn
