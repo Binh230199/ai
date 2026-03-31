@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["source_rule", "target_rule", "relationship", "reason"],
+  "properties": {
+    "source_rule": { "type": "string" },
+    "target_rule": { "type": "string" },
+    "relationship": {
+      "type": "string",
+      "enum": ["reinforces", "prerequisite", "overlap", "conflict-risk", "fix-order"]
+    },
+    "reason": { "type": "string" }
+  }
+}

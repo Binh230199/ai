@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": [
+    "rule_id",
+    "title",
+    "family",
+    "intent",
+    "preferred_pattern",
+    "anti_patterns",
+    "related_rules",
+    "conflict_risk",
+    "evidence_location"
+  ],
+  "properties": {
+    "rule_id": { "type": "string" },
+    "title": { "type": "string" },
+    "family": { "type": "string" },
+    "intent": { "type": "string" },
+    "preferred_pattern": { "type": "string" },
+    "anti_patterns": { "type": "array", "items": { "type": "string" } },
+    "related_rules": { "type": "array", "items": { "type": "string" } },
+    "conflict_risk": { "type": "array", "items": { "type": "string" } },
+    "evidence_location": { "type": "string" }
+  }
+}

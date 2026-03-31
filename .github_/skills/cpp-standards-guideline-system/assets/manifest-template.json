@@ -1,0 +1,17 @@
+{
+  "system": "cpp-standards-guideline-system",
+  "standardName": "",
+  "sourceDocument": "",
+  "artifactRoot": "artifacts/cpp-standards-guideline",
+  "outputFile": "",
+  "parsedArtifact": "",
+  "status": "pending",
+  "phases": {
+    "intake": "pending",
+    "ingestion": "pending",
+    "ruleExtraction": "pending",
+    "dependencyMapping": "pending",
+    "synthesis": "pending",
+    "verification": "pending"
+  }
+}
